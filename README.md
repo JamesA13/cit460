@@ -20,7 +20,10 @@ https://docs.ultralytics.com/
 
 At time of writing, the backend responsible for handling this information is Google Firestore, a Cloud-based, Document NoSQL platform offered by Google through the Firebase ecosystem.
 https://firebase.google.com/docs/reference
-`pip install google-cloud-firestore`
+`pip install google-cloud-firestore` and `pip install firebase_admin`
 
 With experience implementing Firestore in a React application, a brief YouTube tutorial by user "Code First with Hala" was extremely helpful in establishing the syntax differences with a Python app.
 https://www.youtube.com/playlist?list=PLs3IFJPw3G9LW-rGJ8EBMaCd8OxGm_qQe
+
+Method in app.py to draw boxes around detected objects with color shamelessly 'inspired' by the implementation in this YouTube video by user "Michael Reeves":
+https://youtu.be/oA85M9JHsW0?si=G7-bTp3-tkTRBJZw
