@@ -52,3 +52,10 @@ def delete_doc_with_id(collection, doc_id):
 
 def delete_field_with_id(collection, doc_id, field):
     db.collection(collection).document(doc_id).update({field:firestore.firestore.DELETE_FIELD})
+
+
+def updateTimestamp():
+    try:
+        update_doc_with_id("test", "timestamps", "last_check", datetime.datetime.now())
+    except:
+        create_doc_with_id("test", "timestamps", {"last_check": datetime.datetime.now()})

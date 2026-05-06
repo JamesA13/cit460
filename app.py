@@ -2,6 +2,7 @@ import cv2
 from ultralytics import YOLO
 import random
 from firebase_use import *
+from outputs import outputs
 
 model = YOLO('yolo26n.pt')
 
@@ -13,7 +14,7 @@ frame_width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 # Define the codec and create VideoWriter object
-print("Please enter a filename for the next recording:")
+# print("Please enter a filename for the next recording:")
 # filename = input()
 filename = 'test'
 print("Please enter the desired object code:")
@@ -41,7 +42,14 @@ def showDetections(img, detections, threshold): #frame, results[list] from model
 
             cv2.putText(img, boxLabel, (x1 + 10, y1 - baseline + 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 1)
 
-targetMin = 2
+def validateInput(input):
+    try:
+        if int(input) in range(0, 80):
+            return True
+        else:
+            return False
+    except:
+        return False
 
 #Provide the list output of the model detection method and tally a count of the specified object detected in a given frame
 #Method accepts targetCls argument, an integer value corresponding to one of the possible outputs from the detection model
@@ -52,40 +60,66 @@ def trackQuantity(detections, targetCls):
 
     boxes = detections.boxes
     for box in boxes:
-        if int(box.cls[0]) == targetCls:
+        if int(box.cls[0]) == int(targetCls):
             currentCount += 1
 
     return currentCount
 
+targetMin = 2
+
 def checkLowQty(detections, minQty, targetCls):
-    print("Checking qty")
     qoh = trackQuantity(detections, targetCls)
     if qoh <= minQty:
-        #generate log and alert
+        #generate log
         try:
             update_doc_with_id("qoh_logs", str(targetCls), "qoh", qoh)
-            update_doc_with_id("qoh_logs", str(targetCls), "timestamp", firestore.firestore.SERVER_TIMESTAMP)
+            update_doc_with_id("qoh_logs", str(targetCls), "timestamp", datetime.datetime.now())
         except:
-            create_doc_with_id("qoh_logs", str(targetCls), {"qoh": qoh, "timestamp": firestore.firestore.SERVER_TIMESTAMP})
-    print("Checking qty complete")
+            create_doc_with_id("qoh_logs", str(targetCls), {"qoh": qoh, "timestamp": datetime.datetime.now()})
     return
     
-def checkIncorrectItem(detections, threshold, targetCls):
+def checkIncorrectItem(detections, targetCls):
     boxes = detections.boxes
     for box in boxes:
         if int(box.cls[0]) != targetCls:
             try:
-                update_doc_with_id("placement_error_logs", str(targetCls), "timestamp", firestore.firestore.SERVER_TIMESTAMP)
+                update_doc_with_id("placement_error_logs", str(targetCls), "timestamp", datetime.datetime.now())
             except:
-                create_doc_with_id("placement_error_logs", str(targetCls), {"timestamp": firestore.firestore.SERVER_TIMESTAMP})
+                create_doc_with_id("placement_error_logs", str(targetCls), {"timestamp": datetime.datetime.now()})
     return
 
-def checkTimestamp(collection, doc_id):
-    timestamp = read_doc_with_id(collection, doc_id)
-    print(timestamp)
-    print(type(timestamp))
-    return
+def updateTimestamp():
+    try:
+        update_doc_with_id("test", "timestamps", "last_check", datetime.datetime.now())
+    except:
+        create_doc_with_id("test", "timestamps", {"last_check": datetime.datetime.now()})
 
+def updateTimestampCache():
+    return read_doc_with_id("test", "timestamps")
+
+last_time = updateTimestampCache()
+
+def runInventoryChecks(detections, minQty, targetCls):
+    global last_time
+    a = datetime.datetime.now(datetime.timezone.utc)
+    b = last_time["last_check"]
+    print((datetime.datetime.now(datetime.timezone.utc)).second)
+    print(last_time["last_check"].second)
+
+    if (a - b).total_seconds() > (60 * 15): # 15 minutes x 60 seconds = 900 seconds
+        update_doc_with_id("test", "timestamps", "last_check", datetime.datetime.now(datetime.timezone.utc))
+        last_time = updateTimestampCache()
+        print(last_time["last_check"])
+        print(last_time["last_check"].second)
+        checkLowQty(detections, minQty, targetCls)
+        checkIncorrectItem(detections, targetCls)
+    else:
+        print("False")
+
+
+while validateInput(currentCls) == False:
+    print("Please enter an integer between 0-79")
+    currentCls = input()
 
 print("Beginning recording for " + filename)
 while True:
@@ -100,11 +134,7 @@ while True:
     # Display the captured frame
     cv2.imshow('Camera', frame)
 
-    # Press 'l' to run low quantity check, 'i' to run incorrect item check
-    if cv2.waitKey(1) == ord('l'):
-        checkLowQty(results, 2, 39)
-    elif cv2.waitKey(1) == ord('i'):
-        checkIncorrectItem(results, .6, currentCls)
+    runInventoryChecks(results, targetMin, currentCls)
 
     # Press 'q' to exit the loop
     if cv2.waitKey(1) == ord('q'):
@@ -114,4 +144,3 @@ while True:
 cv2.destroyAllWindows()
 cam.release()
 out.release()
-# print(results)
